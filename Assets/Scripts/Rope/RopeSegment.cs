@@ -1,8 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// One link in the rope chain. Owns its hinge to the segment above it,
-/// triggers a spark + cut sound when severed, and informs its Rope.
+/// One link in the rope chain. Holds the hinge to the segment above it
+/// (upperJoint). The LAST link additionally holds a second hinge (tailJoint)
+/// that attaches it to the rope's target body — see Rope.Build.
 /// </summary>
 public class RopeSegment : MonoBehaviour
 {
@@ -11,10 +12,15 @@ public class RopeSegment : MonoBehaviour
 
     [HideInInspector] public Rigidbody2D body;
     [HideInInspector] public CapsuleCollider2D capsule;
-    [HideInInspector] public HingeJoint2D joint;
     [HideInInspector] public SpriteRenderer visual;
 
-    /// <summary>Local-space half length of the sprite piece (set by Rope.StretchVisual).</summary>
+    /// <summary>Hinge attaching this piece to the piece ABOVE it (or the anchor).</summary>
+    [HideInInspector] public HingeJoint2D upperJoint;
+
+    /// <summary>ONLY set on the last segment: its second hinge to the target body.</summary>
+    [HideInInspector] public HingeJoint2D tailJoint;
+
+    /// <summary>Local-space half length of the sprite piece (set by Rope.Stretch).</summary>
     [HideInInspector] public float halfLocalY;
 
     [Header("Effects")]
@@ -29,27 +35,32 @@ public class RopeSegment : MonoBehaviour
         CacheComponents();
     }
 
-    void CacheComponents()
+    public void CacheComponents()
     {
         body = GetComponent<Rigidbody2D>();
         capsule = GetComponent<CapsuleCollider2D>();
-        joint = GetComponent<HingeJoint2D>();
         visual = GetComponent<SpriteRenderer>();
+
+        var joints = GetComponents<HingeJoint2D>();
+        upperJoint = joints.Length > 0 ? joints[0] : null;
+        tailJoint = joints.Length > 1 ? joints[1] : null; // last segment only
     }
 
     /// <summary>
     /// Sever this segment from the piece above it. Safe to call twice:
-    /// the second call is a no-op.
+    /// the second call is a no-op. Only the UPPER joint is destroyed, so the
+    /// lower chain (and the last link's tailJoint to the hero) stays intact.
     /// </summary>
     public void Cut()
     {
         if (cut) return;
         cut = true;
 
-        // Destroying the hinge freezes this segment onto whatever is BELOW it,
-        // so the rope splits at exactly this link. No rendering code needed:
-        // every piece draws itself at its physics position.
-        if (joint != null) Destroy(joint);
+        if (upperJoint != null)
+        {
+            Destroy(upperJoint);
+            upperJoint = null;
+        }
 
         if (sparkBurst != null)
         {

@@ -52,15 +52,19 @@ public class Rope : MonoBehaviour
         if (segmentPrefab == null) { Debug.LogError("[Rope] segmentPrefab not assigned"); return; }
         if (anchor == null || target == null) { Debug.LogError("[Rope] anchor/target not assigned"); return; }
 
+        // The rope ties to the hero's UPPER body at its local (0, 0.4) point
+        // (see the tail joint below), so the chain must span anchor -> tie
+        // point. Spanning anchor -> centre instead leaves 0.4 of slack and the
+        // tail hinge stays permanently violated (solver limbo: hovering hero).
         Vector2 a = anchor.position;
-        Vector2 b = target.transform.position;
-        float dist = Vector2.Distance(a, b);
+        Vector2 tie = target.transform.TransformPoint(new Vector3(0f, 0.4f, 0f));
+        float dist = Vector2.Distance(a, tie);
         if (dist < segmentLength * 0.5f) { Debug.LogError("[Rope] target too close to anchor", this); return; }
 
         // Effective per-link rest length; total chain length == distance so the
         // rope reads taut at first frame and hangs without visible stretching.
         float spacing = dist / segmentCount;
-        Vector2 dir = (b - a) / dist;
+        Vector2 dir = (tie - a) / dist;
 
         // First joint connects to a static, immovable anchor body.
         anchorBody = anchor.GetComponent<Rigidbody2D>();
@@ -80,20 +84,23 @@ public class Rope : MonoBehaviour
             segments.Add(seg);
 
             Stretch(seg, spacing);
+            // EVERY segment keeps its own hinge to the one above it.
             ConfigureJoint(seg, i == 0 ? anchorBody : prev.body, i == 0 ? a : (Vector2?)null);
             prev = seg;
         }
 
-        // Attach the tail to the target body: anchor on the last piece's
-        // target-side end (+Y).
+        // Attach the tail with a SECOND hinge on the last segment; its original
+        // hinge stays connected to the previous segment.
         var last = segments[segments.Count - 1];
-        var tailJoint = last.joint;
-        tailJoint.connectedBody = target;
-        tailJoint.autoConfigureConnectedAnchor = false;
-        tailJoint.enableCollision = false;
-        tailJoint.anchor = new Vector2(0f, last.halfLocalY);
-        Vector2 tailWorld = last.transform.TransformPoint(new Vector3(0f, last.halfLocalY, 0f));
-        tailJoint.connectedAnchor = target.transform.InverseTransformPoint(tailWorld);
+        var tail = last.gameObject.AddComponent<HingeJoint2D>();
+        tail.useLimits = false;
+        tail.enableCollision = false;
+        tail.autoConfigureConnectedAnchor = false;
+        tail.connectedBody = target;
+        // Anchor on the last link's target-side end, tied to the hero's upper body.
+        tail.anchor = new Vector2(0f, last.halfLocalY);
+        tail.connectedAnchor = new Vector2(0f, 0.4f);
+        last.tailJoint = tail;
     }
 
     /// <summary>Stretches/rotates one segment piece so the chain reads as a continuous rope.</summary>
@@ -116,9 +123,11 @@ public class Rope : MonoBehaviour
 
     void ConfigureJoint(RopeSegment seg, Rigidbody2D connected, Vector2? worldAnchor)
     {
-        var hj = seg.joint;
+        var hj = seg.GetComponent<HingeJoint2D>(); // the ORIGINAL hinge = upper joint
         hj.enableCollision = false;
         hj.autoConfigureConnectedAnchor = false;
+        hj.useLimits = false;
+        seg.upperJoint = hj;
 
         hj.connectedBody = connected;
         // Local +Y points toward the target (along dir), so the joint that
