@@ -12,8 +12,9 @@ GameObject:
   - component: {fileID: 592707325626688764}
   - component: {fileID: 8769023731497625582}
   - component: {fileID: 6584215130423618709}
-  - component: {fileID: 3658274825279934899}
-  m_Layer: 0
+  - component: {fileID: 4664784440241927013}
+  - component: {fileID: 1363281053958388355}
+  m_Layer: 8
   m_Name: RopeSegment
   m_TagString: Rope
   m_Icon: {fileID: 0}
@@ -82,10 +83,10 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: -1
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 4066613596543069364, guid: 98e49fb02863e3e479600a513b30c750, type: 3}
-  m_Color: {r: 0.75, g: 0.6, b: 0.25, a: 1}
+  m_Sprite: {fileID: -2603600634579841175, guid: 8d0078941a1bacd449024160d6faf5fc, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -108,8 +109,8 @@ Rigidbody2D:
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
   m_Mass: 0.1
-  m_LinearDamping: 0.05
-  m_AngularDamping: 0.05
+  m_LinearDamping: 0.3
+  m_AngularDamping: 0.5
   m_GravityScale: 1
   m_Material: {fileID: 0}
   m_IncludeLayers:
@@ -118,7 +119,7 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
@@ -136,7 +137,7 @@ HingeJoint2D:
   m_BreakForce: Infinity
   m_BreakTorque: Infinity
   m_BreakAction: 3
-  m_AutoConfigureConnectedAnchor: 1
+  m_AutoConfigureConnectedAnchor: 0
   m_Anchor: {x: 0, y: 0}
   m_ConnectedAnchor: {x: 0, y: 0}
   m_UseConnectedAnchor: 1
@@ -148,8 +149,28 @@ HingeJoint2D:
   m_AngleLimits:
     m_LowerAngle: -60
     m_UpperAngle: 60
---- !u!61 &3658274825279934899
-BoxCollider2D:
+--- !u!114 &4664784440241927013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4106180463078884148}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da307a569c36fa8448ce0e8f7909c9a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RopeSegment
+  index: 0
+  rope: {fileID: 0}
+  body: {fileID: 0}
+  capsule: {fileID: 0}
+  joint: {fileID: 0}
+  visual: {fileID: 0}
+  halfLocalY: 0
+  sparkBurst: {fileID: 4706955109832757541, guid: af654b9473106b54a8d1283f57c8d31b, type: 3}
+--- !u!70 &1363281053958388355
+CapsuleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -178,19 +199,10 @@ BoxCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_SpriteTilingProperty:
-    border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 2.2, y: 0.7}
-    newSize: {x: 2.2, y: 0.7}
-    adaptiveTilingThreshold: 0.5
-    drawMode: 0
-    adaptiveTiling: 0
-  m_AutoTiling: 0
-  m_Size: {x: 0.1, y: 1}
-  m_EdgeRadius: 0
+  m_Size: {x: 0.64, y: 0.04}
+  m_Direction: 0
