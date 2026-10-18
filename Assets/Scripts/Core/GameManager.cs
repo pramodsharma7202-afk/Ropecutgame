@@ -15,6 +15,18 @@ public class GameManager : MonoBehaviour
     private static GameManager instance;
     public static GameManager Instance => instance;
 
+    /// <summary>Ensures a GameManager instance exists (Awake may not run in edit mode).</summary>
+    public static void EnsureInstance()
+    {
+        if (instance != null) return;
+        instance = GameObject.FindObjectOfType<GameManager>();
+        if (instance == null)
+        {
+            var go = new GameObject("GameManager");
+            instance = go.AddComponent<GameManager>();
+        }
+    }
+
     [Header("Out of bounds")]
     [Tooltip("Hero below this y is out of bounds (lost).")]
     [SerializeField] private float heroKillY = -8f;
@@ -25,6 +37,14 @@ public class GameManager : MonoBehaviour
     [SerializeField] private string[] levelScenes;
 
     public GameState State { get; private set; } = GameState.Playing;
+
+    /// <summary>Reset state to Playing and notify listeners (called by LevelLoader).</summary>
+    public void ResetForLevel()
+    {
+        State = GameState.Playing;
+        OnLevelLoaded?.Invoke();
+        Debug.Log("[GameManager] state reset to Playing");
+    }
 
     /// <summary>Number of successful state transitions since app start (diagnostics).</summary>
     public int WinCount { get; private set; }

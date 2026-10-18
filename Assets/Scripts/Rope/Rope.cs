@@ -79,6 +79,7 @@ public class Rope : MonoBehaviour
             go.transform.SetParent(transform, true);
 
             var seg = go.GetComponent<RopeSegment>();
+            seg.ForceComponentRefresh(); // ensures Awake-cached refs are valid in edit mode
             seg.index = i;
             seg.rope = this;
             segments.Add(seg);

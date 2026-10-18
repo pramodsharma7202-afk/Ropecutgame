@@ -509,6 +509,100 @@ public static class RopeBuilderEditor
         sb.Add("scene=" + UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
         return string.Join("; ", sb.ToArray());
     }
+
+    // ------------------------------------------------------------------
+    // Level system test: loads each of the 5 levels in edit mode,
+    // steps 3 seconds of physics with NO cut, and reports whether the
+    // hero stays suspended (level OK) or falls (broken level).
+    // ------------------------------------------------------------------
+    [MenuItem("RopeCut/Test All Levels")]
+    public static void TestAllLevels()
+    {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != "Assets/Scenes/Game.unity")
+        {
+            var opened = UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Scenes/Game.unity");
+            if (opened == null)
+            {
+                Debug.LogError("[LevelTest] Game.unity not found - run RopeCut/Create Game Scene first");
+                return;
+            }
+        }
+
+        var prevMode = Physics2D.simulationMode;
+        Physics2D.simulationMode = UnityEngine.SimulationMode2D.Script;
+
+        // Test harness: GameManager + LevelLoader (not cleared by loader.Clear())
+        var harness = new GameObject("~LevelTestHarness");
+        var loader = harness.AddComponent<LevelLoader>();
+        loader.heroPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Hero.prefab");
+        loader.anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Anchor.prefab");
+        loader.ropeSegmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RopeSegment.prefab");
+        loader.boxPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Box.prefab");
+        loader.spikesPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Spikes.prefab");
+        loader.firePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Fire.prefab");
+        loader.waterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Water.prefab");
+        loader.doorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Door.prefab");
+        loader.pinPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Pin.prefab");
+
+        var sb = new System.Text.StringBuilder();
+        float dt = Time.fixedDeltaTime;
+        int stepsPerLevel = Mathf.RoundToInt(3f / dt); // 3 seconds of physics
+
+        for (int i = 0; i < 5; i++)
+        {
+            var level = AssetDatabase.LoadAssetAtPath<LevelData>($"Assets/Data/Levels/Level_{i + 1:D3}.asset");
+            if (level == null)
+            {
+                sb.AppendLine($"Level {i + 1}: MISSING asset");
+                continue;
+            }
+
+            loader.Load(level);
+
+            // Find hero
+            float heroStartY = 0f;
+            float heroMinY = float.PositiveInfinity;
+            bool heroFell = false;
+            var heroGo = GameObject.Find("Hero");
+            if (heroGo != null)
+            {
+                var rb = heroGo.GetComponent<Rigidbody2D>();
+                heroStartY = rb.position.y;
+                heroMinY = heroStartY;
+            }
+
+            // Count ropes before stepping
+            int ropeSegments = 0;
+            foreach (var r in GameObject.FindObjectsOfType<Rope>())
+                ropeSegments += r.Segments.Count;
+
+            // Step 3 seconds of physics with NO cut
+            for (int s = 0; s < stepsPerLevel; s++)
+            {
+                Physics2D.Simulate(dt);
+                var hg = GameObject.Find("Hero");
+                if (hg != null)
+                {
+                    var rb = hg.GetComponent<Rigidbody2D>();
+                    float y = rb.position.y;
+                    heroMinY = Mathf.Min(heroMinY, y);
+                    if (y < -5f) { heroFell = true; break; } // fell below ground
+                }
+            }
+
+            var hg2 = GameObject.Find("Hero");
+            string heroState = hg2 != null ? hg2.transform.position.ToString("F2") : "MISSING";
+            string fallStatus = heroFell ? "FELL WITHOUT CUT (BROKEN)" : "held (OK)";
+            sb.AppendLine($"Level {i + 1} ({level.name}): ropeSegs={ropeSegments} heroStartY={heroStartY:F2} heroAfter3s={heroState} minY={heroMinY:F2} {fallStatus}");
+
+            loader.Clear();
+        }
+
+        Physics2D.simulationMode = prevMode;
+        UnityEngine.Object.DestroyImmediate(harness);
+
+        Debug.Log("[LevelTest] 3-second no-cut test results:\\n" + sb.ToString());
+    }
 }
 
 [InitializeOnLoad]
