@@ -511,97 +511,151 @@ public static class RopeBuilderEditor
     }
 
     // ------------------------------------------------------------------
-    // Level system test: loads each of the 5 levels in edit mode,
-    // steps 3 seconds of physics with NO cut, and reports whether the
-    // hero stays suspended (level OK) or falls (broken level).
+    // Play-mode level test (RopeCut/Test All Levels). Runs entirely in
+    // Play mode so physics steps naturally. Uses SessionState to survive
+    // the domain reload that happens when entering Play mode.
     // ------------------------------------------------------------------
+    public const string LevelTestPendingKey = "LevelTestPending";
+    static int levelTestIndex;
+    static float levelTestTimer;
+    static bool levelTestNeedsLoad;
+    static LevelLoader levelTestLoader;
+    static GameObject levelTestHarness;
+
     [MenuItem("RopeCut/Test All Levels")]
     public static void TestAllLevels()
     {
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != "Assets/Scenes/Game.unity")
+        if (!EditorApplication.isPlaying)
         {
-            var opened = UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Scenes/Game.unity");
-            if (opened == null)
-            {
-                Debug.LogError("[LevelTest] Game.unity not found - run RopeCut/Create Game Scene first");
-                return;
-            }
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != "Assets/Scenes/Game.unity")
+                EditorSceneManager.OpenScene("Assets/Scenes/Game.unity");
+            SessionState.SetBool(LevelTestPendingKey, true);
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartLevelTestRunner();
+    }
+
+    public static void StartLevelTestRunner()
+    {
+        levelTestIndex = 0;
+        levelTestTimer = 0f;
+        levelTestNeedsLoad = true;
+        levelTestLoader = null;
+        levelTestHarness = null;
+        EditorApplication.update -= LevelTestUpdate;
+        EditorApplication.update += LevelTestUpdate;
+        Debug.Log("[LevelTest] runner started");
+    }
+
+    static void StopLevelTest(string reason)
+    {
+        EditorApplication.update -= LevelTestUpdate;
+        if (levelTestHarness != null) UnityEngine.Object.Destroy(levelTestHarness);
+        levelTestHarness = null;
+        levelTestLoader = null;
+        Debug.Log("[LevelTest] runner stopped: " + reason);
+    }
+
+    static void LevelTestUpdate()
+    {
+        if (!EditorApplication.isPlaying) { StopLevelTest("play mode exited"); return; }
+
+        // Setup harness on first tick.
+        if (levelTestHarness == null)
+        {
+            levelTestHarness = new GameObject("~LevelTestHarness");
+            levelTestLoader = levelTestHarness.AddComponent<LevelLoader>();
+            levelTestLoader.heroPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Hero.prefab");
+            levelTestLoader.anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Anchor.prefab");
+            levelTestLoader.ropeSegmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RopeSegment.prefab");
+            levelTestLoader.boxPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Box.prefab");
+            levelTestLoader.spikesPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Spikes.prefab");
+            levelTestLoader.firePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Fire.prefab");
+            levelTestLoader.waterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Water.prefab");
+            levelTestLoader.doorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Door.prefab");
+            levelTestLoader.pinPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Pin.prefab");
+            levelTestIndex = 0;
+            levelTestNeedsLoad = true;
+            levelTestTimer = 0f;
         }
 
-        var prevMode = Physics2D.simulationMode;
-        Physics2D.simulationMode = UnityEngine.SimulationMode2D.Script;
-
-        // Test harness: GameManager + LevelLoader (not cleared by loader.Clear())
-        var harness = new GameObject("~LevelTestHarness");
-        var loader = harness.AddComponent<LevelLoader>();
-        loader.heroPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Hero.prefab");
-        loader.anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Anchor.prefab");
-        loader.ropeSegmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RopeSegment.prefab");
-        loader.boxPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Box.prefab");
-        loader.spikesPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Spikes.prefab");
-        loader.firePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Fire.prefab");
-        loader.waterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Water.prefab");
-        loader.doorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Door.prefab");
-        loader.pinPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Pin.prefab");
-
-        var sb = new System.Text.StringBuilder();
-        float dt = Time.fixedDeltaTime;
-        int stepsPerLevel = Mathf.RoundToInt(3f / dt); // 3 seconds of physics
-
-        for (int i = 0; i < 5; i++)
+        // All levels done?
+        if (levelTestIndex >= 5)
         {
-            var level = AssetDatabase.LoadAssetAtPath<LevelData>($"Assets/Data/Levels/Level_{i + 1:D3}.asset");
+            // Verify zero Hero objects remain.
+            var heroes = GameObject.FindGameObjectsWithTag("Hero");
+            if (heroes.Length != 0)
+            {
+                Debug.LogError("[LevelTest] FAIL: " + heroes.Length + " Hero objects remain after all levels!");
+            }
+            else
+            {
+                Debug.Log("[LevelTest] PASS: zero Hero objects remain after all levels.");
+            }
+            StopLevelTest("complete");
+            EditorApplication.isPlaying = false;
+            return;
+        }
+
+        // Load level if needed.
+        if (levelTestNeedsLoad)
+        {
+            var level = AssetDatabase.LoadAssetAtPath<LevelData>($"Assets/Data/Levels/Level_{levelTestIndex + 1:D3}.asset");
             if (level == null)
             {
-                sb.AppendLine($"Level {i + 1}: MISSING asset");
-                continue;
+                Debug.LogError("[LevelTest] Level " + (levelTestIndex + 1) + " asset missing!");
+                levelTestIndex++;
+                return;
             }
-
-            loader.Load(level);
-
-            // Find hero
-            float heroStartY = 0f;
-            float heroMinY = float.PositiveInfinity;
-            bool heroFell = false;
-            var heroGo = GameObject.Find("Hero");
-            if (heroGo != null)
-            {
-                var rb = heroGo.GetComponent<Rigidbody2D>();
-                heroStartY = rb.position.y;
-                heroMinY = heroStartY;
-            }
-
-            // Count ropes before stepping
-            int ropeSegments = 0;
-            foreach (var r in GameObject.FindObjectsOfType<Rope>())
-                ropeSegments += r.Segments.Count;
-
-            // Step 3 seconds of physics with NO cut
-            for (int s = 0; s < stepsPerLevel; s++)
-            {
-                Physics2D.Simulate(dt);
-                var hg = GameObject.Find("Hero");
-                if (hg != null)
-                {
-                    var rb = hg.GetComponent<Rigidbody2D>();
-                    float y = rb.position.y;
-                    heroMinY = Mathf.Min(heroMinY, y);
-                    if (y < -5f) { heroFell = true; break; } // fell below ground
-                }
-            }
-
-            var hg2 = GameObject.Find("Hero");
-            string heroState = hg2 != null ? hg2.transform.position.ToString("F2") : "MISSING";
-            string fallStatus = heroFell ? "FELL WITHOUT CUT (BROKEN)" : "held (OK)";
-            sb.AppendLine($"Level {i + 1} ({level.name}): ropeSegs={ropeSegments} heroStartY={heroStartY:F2} heroAfter3s={heroState} minY={heroMinY:F2} {fallStatus}");
-
-            loader.Clear();
+            levelTestLoader.Load(level);
+            levelTestNeedsLoad = false;
+            levelTestTimer = 0f;
+            Debug.Log("[LevelTest] Level " + (levelTestIndex + 1) + " loaded");
+            return;
         }
 
-        Physics2D.simulationMode = prevMode;
-        UnityEngine.Object.DestroyImmediate(harness);
+        // Wait 3 seconds (real frames).
+        levelTestTimer += Time.deltaTime;
+        if (levelTestTimer < 3f) return;
 
-        Debug.Log("[LevelTest] 3-second no-cut test results:\\n" + sb.ToString());
+        // Sample and verify.
+        var hero = GameObject.Find("Hero");
+        var ropes = GameObject.FindObjectsOfType<Rope>();
+        int ropeSegs = 0;
+        foreach (var r in ropes) ropeSegs += r.Segments.Count;
+
+        var levelAsset = AssetDatabase.LoadAssetAtPath<LevelData>($"Assets/Data/Levels/Level_{levelTestIndex + 1:D3}.asset");
+        // Expected children of LevelRoot: hero(1) + anchors(ropes) + ropeGOs(ropes) + level objects + goal(1)
+        int expectedObjs = 1 + levelAsset.ropes.Count + levelAsset.ropes.Count + levelAsset.objects.Count + 1;
+
+        var levelRoot = GameObject.Find("LevelRoot");
+        int actualChildCount = levelRoot != null ? levelRoot.transform.childCount : 0;
+
+        string heroPos = hero != null ? hero.transform.position.ToString("F2") : "MISSING";
+        bool heroFell = hero != null && hero.transform.position.y < -5f;
+        string status = heroFell ? "FELL WITHOUT CUT (BROKEN)" : "held (OK)";
+
+        Debug.Log($"[LevelTest] Level {levelTestIndex + 1} ({levelAsset.name}): hero={heroPos} ropeSegs={ropeSegs} levelRootChildren={actualChildCount} expected={expectedObjs} {status}");
+
+        if (actualChildCount != expectedObjs)
+        {
+            Debug.LogError($"[LevelTest] FAIL Level {levelTestIndex + 1}: expected {expectedObjs} children in LevelRoot, got {actualChildCount}");
+        }
+        if (hero == null)
+        {
+            Debug.LogError($"[LevelTest] FAIL Level {levelTestIndex + 1}: Hero missing!");
+        }
+        if (heroFell)
+        {
+            Debug.LogError($"[LevelTest] FAIL Level {levelTestIndex + 1}: Hero fell without cut!");
+        }
+
+        // Clear and advance.
+        levelTestLoader.Clear();
+        levelTestIndex++;
+        levelTestNeedsLoad = true;
+        levelTestTimer = 0f;
     }
 }
 
@@ -613,9 +667,18 @@ static class RopeHangTestHook
         EditorApplication.update += () =>
         {
             if (!EditorApplication.isPlaying || EditorApplication.isCompiling) return;
-            if (!SessionState.GetBool(RopeBuilderEditor.HangTestPendingKey, false)) return;
-            SessionState.SetBool(RopeBuilderEditor.HangTestPendingKey, false);
-            RopeBuilderEditor.StartHangTestRunner();
+            if (SessionState.GetBool(RopeBuilderEditor.HangTestPendingKey, false))
+            {
+                SessionState.SetBool(RopeBuilderEditor.HangTestPendingKey, false);
+                RopeBuilderEditor.StartHangTestRunner();
+                return;
+            }
+            if (SessionState.GetBool(RopeBuilderEditor.LevelTestPendingKey, false))
+            {
+                SessionState.SetBool(RopeBuilderEditor.LevelTestPendingKey, false);
+                RopeBuilderEditor.StartLevelTestRunner();
+                return;
+            }
         };
     }
 }
