@@ -11,9 +11,10 @@ GameObject:
   - component: {fileID: 749666174673379343}
   - component: {fileID: 379525202030455077}
   - component: {fileID: 2506770064447586905}
+  - component: {fileID: -5049430541365296617}
   m_Layer: 0
   m_Name: Water
-  m_TagString: Untagged
+  m_TagString: Hazard
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -139,3 +140,17 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 0.64, y: 0.64}
   m_EdgeRadius: 0
+--- !u!114 &-5049430541365296617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4361761531138584467}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 148f86d67b2d5ec478953a7e0a8bcad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RopeCutHazard
+  damage: 999
+  killTag: Hero

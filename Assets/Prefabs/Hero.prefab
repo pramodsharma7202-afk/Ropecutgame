@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 819573921431001876}
   - component: {fileID: 3993307434489652503}
   - component: {fileID: 3582311617223002486}
+  - component: {fileID: -2866313712314668607}
   m_Layer: 0
   m_Name: Hero
   m_TagString: Hero
@@ -180,3 +181,21 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &-2866313712314668607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6225044140247148788}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 396f87167b47d5843bdb0631cec6cae6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeroReaction
+  happySprite: {fileID: 0}
+  scaredSprite: {fileID: 0}
+  bounceScale: 1.15
+  bounceTime: 0.3
+  squashScale: 0.85
+  squashTime: 0.2

@@ -332,6 +332,183 @@ public static class RopeBuilderEditor
         sb.Add("cutSoundPlays=" + sound);
         return string.Join("; ", sb.ToArray());
     }
+
+    // ------------------------------------------------------------------
+    // RopeTest2: game-loop test scene. Anchor + Hero on a rope, Spikes on
+    // the ground to the left, Door (RopeCutGoal) on the ground to the
+    // right. A cut with a rightward swing lands the hero in the door (win);
+    // a leftward swing lands it on the spikes (lose).
+    // ------------------------------------------------------------------
+    const string Test2ScenePath = "Assets/Scenes/RopeTest2.unity";
+
+    [MenuItem("RopeCut/Create RopeTest2 Scene")]
+    public static string CreateRopeTest2Scene()
+    {
+        var segmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(RopeSegmentPrefab);
+        var anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AnchorPrefab);
+        var heroPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(HeroPrefab);
+        var spikesPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Spikes.prefab");
+        var doorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Door.prefab");
+        var audioPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/AudioManager.prefab");
+        if (segmentPrefab == null || anchorPrefab == null || heroPrefab == null ||
+            spikesPrefab == null || doorPrefab == null || audioPrefab == null)
+            return "missing prefab(s)";
+
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+        // Camera: orthographic + AudioListener + playfield fit
+        var camGo = new GameObject("Main Camera");
+        camGo.tag = "MainCamera";
+        var cam = camGo.AddComponent<Camera>();
+        cam.orthographic = true;
+        cam.nearClipPlane = -10f;
+        cam.backgroundColor = new Color(0.07f, 0.07f, 0.10f);
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        camGo.transform.position = new Vector3(0f, 0f, -10f);
+        camGo.AddComponent<AudioListener>();
+        var fit = camGo.AddComponent<PlayfieldCameraFit>();
+        fit.referenceWidth = 10f;
+        fit.minOrthoSize = 6f;
+
+        // Game loop manager + audio
+        new GameObject("GameManager").AddComponent<GameManager>();
+        PrefabUtility.InstantiatePrefab(audioPrefab);
+
+        // Ground: BoxCollider2D whose top surface sits exactly at y = -5
+        var ground = new GameObject("Ground");
+        ground.transform.position = new Vector3(0f, -5.5f, 0f);
+        var gc = ground.AddComponent<BoxCollider2D>();
+        gc.size = new Vector2(30f, 1f);
+
+        // Spikes on the ground, left of the hero (solid collider + RopeCutHazard)
+        var spikes = (GameObject)PrefabUtility.InstantiatePrefab(spikesPrefab);
+        spikes.transform.position = new Vector3(-2.5f, -4.65f, 0f);
+        spikes.name = "Spikes";
+
+        // Door on the ground, right of the hero (trigger + RopeCutGoal)
+        var door = (GameObject)PrefabUtility.InstantiatePrefab(doorPrefab);
+        door.transform.position = new Vector3(2.5f, -4.65f, 0f);
+        door.name = "Door";
+
+        // Anchor + Hero + rope
+        var anchor = (GameObject)PrefabUtility.InstantiatePrefab(anchorPrefab);
+        anchor.transform.position = new Vector3(0f, 4f, 0f);
+        anchor.name = "Anchor";
+
+        var hero = (GameObject)PrefabUtility.InstantiatePrefab(heroPrefab);
+        hero.transform.position = new Vector3(0f, 1f, 0f);
+        hero.name = "Hero";
+        var heroBody = hero.GetComponent<Rigidbody2D>();
+        if (heroBody == null) heroBody = hero.AddComponent<Rigidbody2D>();
+        heroBody.mass = 1.5f;
+        heroBody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        var ropeGo = new GameObject("Rope");
+        var rope = ropeGo.AddComponent<Rope>();
+        rope.anchor = anchor.transform;
+        rope.target = heroBody;
+        rope.segmentCount = 12;
+        rope.segmentLength = 0.3f;
+        rope.thickness = 0.12f;
+        rope.ropeColor = new Color(0.75f, 0.60f, 0.25f);
+        rope.segmentPrefab = segmentPrefab;
+
+        // Swipe cutter
+        var cutterGo = new GameObject("RopeCutter");
+        var cutter = cutterGo.AddComponent<RopeCutter>();
+        cutter.cutMask = LayerMask.GetMask("Rope");
+
+        EditorSceneManager.SaveScene(scene, Test2ScenePath);
+        return "scene saved: " + Test2ScenePath;
+    }
+
+    [MenuItem("RopeCut/Run GameLoop Test")]
+    public static void RunGameLoopTest()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != Test2ScenePath)
+                EditorSceneManager.OpenScene(Test2ScenePath);
+            SessionState.SetBool(HangTestPendingKey, false);
+            EditorApplication.isPlaying = true;
+        }
+    }
+
+    /// <summary>
+    /// Phase 0 (call once, right after entering play): verifies scene wiring,
+    /// ensures the rope is built, reports initial game state.
+    /// </summary>
+    public static string GameLoopTestStart()
+    {
+        var report = new System.Collections.Generic.List<string>();
+        var ropeGo = GameObject.Find("Rope");
+        var cutterGo = GameObject.Find("RopeCutter");
+        var heroGo = GameObject.Find("Hero");
+        if (ropeGo == null || cutterGo == null || heroGo == null) return "missing scene objects";
+        var rope = ropeGo.GetComponent<Rope>();
+        var cutter = cutterGo.GetComponent<RopeCutter>();
+        if (GameManager.Instance == null)
+        {
+            var gmGo = new GameObject("~GameManager");
+            gmGo.AddComponent<GameManager>();
+        }
+        if (AudioManager.Instance == null)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/AudioManager.prefab");
+            if (prefab != null) Object.Instantiate(prefab);
+        }
+
+        int steps = 0;
+        while (rope.Segments.Count == 0 && steps++ < 20) rope.Build();
+        report.Add("rope=" + rope.Segments.Count + " cutterEnabled=" + cutter.Enabled);
+        report.Add(GameLoopSample());
+        return string.Join("; ", report.ToArray());
+    }
+
+    /// <summary>Cut the rope and shove the hero sideways (+1 right, -1 left).</summary>
+    public static string GameLoopTestSwing(int dir)
+    {
+        var ropeGo = GameObject.Find("Rope");
+        var cutterGo = GameObject.Find("RopeCutter");
+        var heroGo = GameObject.Find("Hero");
+        if (ropeGo == null || cutterGo == null || heroGo == null) return "missing scene objects";
+        var rope = ropeGo.GetComponent<Rope>();
+        var cutter = cutterGo.GetComponent<RopeCutter>();
+        var hero = heroGo.GetComponent<Rigidbody2D>();
+        if (rope.Segments.Count == 0) return "rope not built";
+
+        var midSeg = rope.Segments[rope.Segments.Count - 7];
+        float midY = midSeg.transform.position.y;
+        int cuts = cutter.CutAt(new Vector2(-1.5f, midY), new Vector2(1.5f, midY));
+        // swing impulse: 3.6 N*s on mass 1.5 => 2.4 m/s, lands on door/spikes at x = +-2.5
+        hero.AddForce(new Vector2(3.6f * dir, 0f), ForceMode2D.Impulse);
+        return "cuts=" + cuts + " impulse=" + (3.6f * dir).ToString("F1");
+    }
+
+    /// <summary>One polling sample of the full game-loop state.</summary>
+    public static string GameLoopSample()
+    {
+        var sb = new System.Collections.Generic.List<string>();
+        var hero = GameObject.Find("Hero");
+        if (hero != null)
+        {
+            var rb = hero.GetComponent<Rigidbody2D>();
+            sb.Add("hero=" + hero.transform.position.ToString("F2") + " speed=" + rb.linearVelocity.magnitude.ToString("F2"));
+        }
+        if (GameManager.Instance != null)
+        {
+            sb.Add("state=" + GameManager.Instance.State + " win=" + GameManager.Instance.WinCount + " lose=" + GameManager.Instance.LoseCount);
+        }
+        if (AudioManager.Instance != null)
+        {
+            sb.Add("sndWin=" + (AudioManager.Instance.PlayCounts.TryGetValue("Win", out var w) ? w : 0) +
+                   " sndLose=" + (AudioManager.Instance.PlayCounts.TryGetValue("Lose", out var l) ? l : 0));
+        }
+        var cutterGo = GameObject.Find("RopeCutter");
+        if (cutterGo != null) sb.Add("cutter=" + cutterGo.GetComponent<RopeCutter>().Enabled);
+        sb.Add("scene=" + UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+        return string.Join("; ", sb.ToArray());
+    }
 }
 
 [InitializeOnLoad]
