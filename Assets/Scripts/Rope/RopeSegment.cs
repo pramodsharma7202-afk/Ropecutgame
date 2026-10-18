@@ -50,6 +50,8 @@ public class RopeSegment : MonoBehaviour
     /// Sever this segment from the piece above it. Safe to call twice:
     /// the second call is a no-op. Only the UPPER joint is destroyed, so the
     /// lower chain (and the last link's tailJoint to the hero) stays intact.
+    /// The capsule is destroyed (piece cannot be cut again) and the sprite
+    /// fades out over 0.15 s instead of vanishing instantly.
     /// </summary>
     public void Cut()
     {
@@ -62,6 +64,20 @@ public class RopeSegment : MonoBehaviour
             upperJoint = null;
         }
 
+        // The capsule is gone: this link can never be linecast-hit again.
+        if (capsule != null)
+        {
+            Destroy(capsule);
+            capsule = null;
+        }
+
+        // Fade the piece out; the body keeps simulating so the rope tears apart.
+        if (visual != null && !fading)
+        {
+            fading = true;
+            fadeElapsed = 0f;
+        }
+
         if (sparkBurst != null)
         {
             var fx = Instantiate(sparkBurst, transform.position, Quaternion.identity);
@@ -72,6 +88,32 @@ public class RopeSegment : MonoBehaviour
 
         if (rope != null) rope.NotifyCut(this);
     }
+
+    void Update()
+    {
+        if (fading) FadeTick(Time.deltaTime);
+    }
+
+    /// <summary>
+    /// Advances the cut-link fade. Called from Update in normal play; public
+    /// so tests can step it deterministically.
+    /// </summary>
+    public void FadeTick(float dt)
+    {
+        if (!fading) return;
+        fadeElapsed += dt;
+        if (visual != null)
+        {
+            var c = visual.color;
+            c.a = Mathf.Clamp01(1f - fadeElapsed / cutFadeTime);
+            visual.color = c;
+        }
+        if (fadeElapsed >= cutFadeTime) fading = false;
+    }
+
+    [SerializeField] float cutFadeTime = 0.15f;
+    bool fading;
+    float fadeElapsed;
 
     /// <summary>Editor-time hook so RopeSegment always has fresh component refs when rebuilt by Rope.</summary>
     public void ForceComponentRefresh() => CacheComponents();

@@ -39,6 +39,7 @@ public static class RopeBuilderEditor
         cam.backgroundColor = new Color(0.07f, 0.07f, 0.10f);
         cam.clearFlags = CameraClearFlags.SolidColor;
         camGo.transform.position = new Vector3(0f, 0f, -10f);
+        camGo.AddComponent<AudioListener>();
 
         // Anchor at (0, 4)
         var anchor = (GameObject)PrefabUtility.InstantiatePrefab(anchorPrefab);
@@ -230,6 +231,106 @@ public static class RopeBuilderEditor
         foreach (var s in rope.Segments)
             if (s != null && s.upperJoint != null) count++;
         return count;
+    }
+
+    // ------------------------------------------------------------------
+    // Swipe-cut test: simulates a horizontal swipe across the middle of
+    // the rope via RopeCutter.CutAt, then measures the cut, the sound,
+    // the fallback, and the hero falling to the ground. Script-driven
+    // stepping (see HangTest note) so measurements are simulation-time.
+    // ------------------------------------------------------------------
+    [MenuItem("RopeCut/Run Cut Test")]
+    public static void RunCutTest()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != TestScenePath)
+                EditorSceneManager.OpenScene(TestScenePath);
+            SessionState.SetBool(HangTestPendingKey, false);
+            EditorApplication.isPlaying = true;
+            EditorApplication.delayCall += () => Debug.Log("[CutTest] " + RunCutTestNow());
+        }
+        else
+        {
+            Debug.Log("[CutTest] " + RunCutTestNow());
+        }
+    }
+
+    static string RunCutTestNow()
+    {
+        var report = new System.Collections.Generic.List<string>();
+        try
+        {
+            var ropeGo = GameObject.Find("Rope");
+            var cutterGo = GameObject.Find("RopeCutter");
+            var heroGo = GameObject.Find("Hero");
+            if (ropeGo == null || cutterGo == null || heroGo == null) return "missing scene objects";
+            var rope = ropeGo.GetComponent<Rope>();
+            var cutter = cutterGo.GetComponent<RopeCutter>();
+            var hero = heroGo.GetComponent<Rigidbody2D>();
+            if (rope == null || cutter == null || hero == null) return "missing components";
+
+            // AudioManager (RopeTest has no baked-in manager)
+            if (AudioManager.Instance == null)
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/AudioManager.prefab");
+                if (prefab != null) Object.Instantiate(prefab);
+            }
+
+            cutter.Enabled = true;
+            // NOTE: no manual SimulationMode switch - with Application.runInBackground
+            // enabled the player loop steps normally even when the editor is unfocused.
+
+            report.Add("queriesHitTriggers=" + Physics2D.queriesHitTriggers);
+
+            // Ensure rope built (Start may be deferred in a stalled loop)
+            int steps = 0;
+            while (rope.Segments.Count == 0 && steps++ < 20) rope.Build();
+            if (rope.Segments.Count == 0) return "rope did not build";
+            int n = rope.Segments.Count;
+
+            var heroBefore = hero.position;
+            report.Add("pre-cut hero=" + heroBefore.ToString("F2") + " preCutCount=" + CountUpper(rope));
+
+            // Swipe line across the middle of the rope (segment 5 area)
+            var midSeg = rope.Segments[rope.Segments.Count - 7]; // index 5 of 12
+            float midY = midSeg.transform.position.y;
+            int cutCalls = cutter.CutAt(new Vector2(-1.5f, midY), new Vector2(1.5f, midY));
+            report.Add("CutAt=" + cutCalls + " (line y=" + midY.ToString("F2") + ")");
+
+            // double-cut attempt on the same line must be a no-op
+            int secondCutCalls = cutter.CutAt(new Vector2(-1.5f, midY), new Vector2(1.5f, midY));
+            report.Add("secondCutAt=" + secondCutCalls);
+
+            int upperAfter = CountUpper(rope);
+            report.Add("upperJoints=" + upperAfter + "/" + n + " (was " + n + ")");
+
+            int cutSoundCount = AudioManager.Instance != null && AudioManager.Instance.PlayCounts.TryGetValue("Cut", out var c) ? c : 0;
+            report.Add("cutSoundPlays=" + cutSoundCount);
+
+            report.Add("cutPieceAlphaPost=" + (midSeg.visual ? midSeg.visual.color.a.ToString("F2") : "n/a") + " doubleSafe=" + (midSeg.upperJoint == null));
+
+            report.Add("NOTE: fall/settling is measured by editor polling (See Phase callbacks)");
+        }
+        finally
+        {
+            // physics mode untouched: the player loop is live
+        }
+        return string.Join("; ", report.ToArray());
+    }
+
+    /// <summary>Phase-B polling call: read the falling hero state once.</summary>
+    public static string CutTestSample()
+    {
+        var hero = GameObject.Find("Hero") ? GameObject.Find("Hero").GetComponent<Rigidbody2D>() : null;
+        var ropeGo = GameObject.Find("Rope");
+        var rope = ropeGo != null ? ropeGo.GetComponent<Rope>() : null;
+        var sb = new System.Collections.Generic.List<string>();
+        if (hero != null) sb.Add("hero=" + hero.transform.position.ToString("F2") + " speed=" + hero.linearVelocity.magnitude.ToString("F2"));
+        if (rope != null) sb.Add("upper=" + CountUpper(rope) + "/" + rope.Segments.Count);
+        int sound = AudioManager.Instance != null && AudioManager.Instance.PlayCounts.TryGetValue("Cut", out var c) ? c : 0;
+        sb.Add("cutSoundPlays=" + sound);
+        return string.Join("; ", sb.ToArray());
     }
 }
 

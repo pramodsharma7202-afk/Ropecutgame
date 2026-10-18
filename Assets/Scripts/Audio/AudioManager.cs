@@ -67,10 +67,14 @@ public class AudioManager : MonoBehaviour
 
     public void Play(string name, float volumeScale = 1f)
     {
+        if (name != null) PlayCounts[name] = PlayCounts.TryGetValue(name, out var n) ? n + 1 : 1;
         if (muted) return;
         if (!namedClips.TryGetValue(name, out var clip) || clip == null) return;
         sfxSource.PlayOneShot(clip, sfxVolume * volumeScale);
     }
+
+    /// <summary>Number of times each sound name was requested (test/diagnostics hook; counts even when muted).</summary>
+    public readonly Dictionary<string, int> PlayCounts = new Dictionary<string, int>();
 
     public void PlayMusic()
     {
