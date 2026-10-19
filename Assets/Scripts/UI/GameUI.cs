@@ -32,10 +32,6 @@ public class GameUI : MonoBehaviour
     void Awake()
     {
         theme = Resources.Load<UITheme>("UITheme");
-#if UNITY_EDITOR
-        if (theme == null)
-            theme = UnityEditor.AssetDatabase.LoadAssetAtPath<UITheme>(ThemePath);
-#endif
         if (theme == null)
             theme = ScriptableObject.CreateInstance<UITheme>(); // fallback defaults
 
@@ -77,6 +73,12 @@ public class GameUI : MonoBehaviour
         // Editor-testing fallback: Enter = Next/Retry (whichever panel shows), R = Restart.
         var kb = UnityEngine.InputSystem.Keyboard.current;
         if (kb == null) return;
+        // Android back / Escape in Game goes to the Menu.
+        if (kb.escapeKey.wasPressedThisFrame)
+        {
+            OnMenuClicked();
+            return;
+        }
         if (GameManager.Instance.State != GameManager.GameState.Playing)
         {
             if (kb.enterKey.wasPressedThisFrame) RetryOrRestart();
@@ -88,6 +90,9 @@ public class GameUI : MonoBehaviour
     {
         levelElapsed = 0f;
         earnedStars = 0;
+        var runner = FindFirstObjectByType<LevelRunner>();
+        if (levelText != null)
+            levelText.text = "Level " + (runner != null ? runner.CurrentLevelIndex + 1 : (PlayerPrefs.GetInt("CurrentLevel", 0) + 1));
         if (winPanel != null) winPanel.SetActive(false);
         if (losePanel != null) losePanel.SetActive(false);
         var cutter = FindFirstObjectByType<RopeCutter>();
@@ -97,13 +102,21 @@ public class GameUI : MonoBehaviour
     void OnRetryClicked()
     {
         Debug.Log("[UI] Retry clicked");
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("Click");
         Restart();
     }
 
     void OnRestartClicked()
     {
         Debug.Log("[UI] Restart clicked");
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("Click");
         Restart();
+    }
+
+    void OnMenuClicked()
+    {
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("Click");
+        SceneManager.LoadScene("Menu");
     }
 
     void RetryOrRestart()
@@ -125,6 +138,7 @@ public class GameUI : MonoBehaviour
         if (runner != null && runner.levels != null && runner.levels.Length > 0)
             next = Mathf.Clamp(next, 0, runner.levels.Length - 1); // never past the last level
         Debug.Log("[UI] Next clicked -> level " + (next + 1));
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("Click");
         PlayerPrefs.SetInt("CurrentLevel", next);
         PlayerPrefs.Save();
         Restart();
@@ -236,19 +250,22 @@ public class GameUI : MonoBehaviour
         var hud = CreateChild("HUD", AnchorPresets.TopStretch);
         SetOffsets(hud, 0, -240, 0, 0);
 
-        levelText = MakeText(hud, "LevelText", "", AnchorPresets.TopCenter,
-            new Vector2(0, -150), new Vector2(400, 90), 50);
+        // layout: level text top-left, Restart top-right, both inside an
+        // 80 px top safe area so they never collide on 1080x1920 portrait.
+        levelText = MakeText(hud, "LevelText", "", AnchorPresets.TopStretch,
+            new Vector2(80, -110), new Vector2(420, 90), 50);
+        levelText.alignment = TextAnchor.MiddleLeft;
         levelText.color = Color.white;
 
         var hudRestart = MakeButton(hud, "RestartButton", theme.secondaryButton,
-            theme.secondaryColour, "Restart", AnchorPresets.TopCenter,
-            new Vector2(0, -150), new Vector2(200, 90));
+            theme.secondaryColour, "Restart", AnchorPresets.TopStretch,
+            new Vector2(0, -110), new Vector2(220, 90));
         hudRestart.onClick.AddListener(OnRestartClicked);
-        // pin the button to the top right
+        // pin the button to the top right inside the safe area
         var rrt = hudRestart.GetComponent<RectTransform>();
         rrt.anchorMin = new Vector2(1, 1);
         rrt.anchorMax = new Vector2(1, 1);
-        rrt.anchoredPosition = new Vector2(-150, -150);
+        rrt.anchoredPosition = new Vector2(-160, -110);
 
         // ---- Win panel (hidden) ----
         var win = CreateChild("WinPanel", AnchorPresets.StretchAll);
@@ -282,6 +299,10 @@ public class GameUI : MonoBehaviour
             new Vector2(170, -280), new Vector2(260, 110));
         winRetry.onClick.AddListener(OnRetryClicked);
 
+        var winMenu = MakeButton(win, "MenuButton", theme.secondaryButton,
+            theme.secondaryColour, "Menu", AnchorPresets.Center, new Vector2(0, -430), new Vector2(240, 100));
+        winMenu.onClick.AddListener(OnMenuClicked);
+
         allCompleteText = MakeText(win, "AllCompleteText", "All levels complete!",
             AnchorPresets.Center, new Vector2(0, -280), new Vector2(800, 90), 44);
         allCompleteText.color = theme.textColour;
@@ -302,6 +323,10 @@ public class GameUI : MonoBehaviour
             theme.secondaryColour, "Retry", AnchorPresets.Center,
             new Vector2(0, -280), new Vector2(280, 110));
         loseRetry.onClick.AddListener(OnRetryClicked);
+
+        var loseMenu = MakeButton(lose, "MenuButton", theme.secondaryButton,
+            theme.secondaryColour, "Menu", AnchorPresets.Center, new Vector2(0, -430), new Vector2(240, 100));
+        loseMenu.onClick.AddListener(OnMenuClicked);
 
         losePanel.SetActive(false);
     }
@@ -380,7 +405,7 @@ public class GameUI : MonoBehaviour
         rect.anchoredPosition = pos;
         rect.sizeDelta = size;
         var text = rect.gameObject.AddComponent<Text>();
-        text.font = theme.fontFamily;
+        text.font = UIFont.Get(theme);
         text.fontSize = fontSize;
         text.alignment = TextAnchor.MiddleCenter;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -397,7 +422,7 @@ public class GameUI : MonoBehaviour
         rect.anchoredPosition = pos;
         rect.sizeDelta = size;
         var image = rect.gameObject.AddComponent<Image>();
-        image.sprite = sprite;
+        if (sprite != null) image.sprite = sprite; // no sprite -> plain colour fill, never a white box
         image.color = color;
         var button = rect.gameObject.AddComponent<Button>();
         if (!button.targetGraphic) button.targetGraphic = image;
@@ -410,7 +435,7 @@ public class GameUI : MonoBehaviour
         tr.offsetMin = Vector2.zero;
         tr.offsetMax = Vector2.zero;
         var text = textGo.AddComponent<Text>();
-        text.font = theme.fontFamily;
+        text.font = UIFont.Get(theme);
         text.fontSize = (int)(theme.baseFontSize * 1.1f);
         text.alignment = TextAnchor.MiddleCenter;
         text.color = theme.textColour;

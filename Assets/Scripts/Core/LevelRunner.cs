@@ -17,6 +17,14 @@ public class LevelRunner : MonoBehaviour
 
     void Start()
     {
+        // Keep both entry points in sync: when no explicit list is wired on
+        // this component, fall back to the shared LevelCatalog resource.
+        if (levels == null || levels.Length == 0)
+        {
+            var catalog = LevelCatalog.Load();
+            if (catalog != null) levels = catalog.levels;
+        }
+
         int idx = PlayerPrefs.GetInt("CurrentLevel", 0);
         if (idx < 0 || levels == null || idx >= levels.Length)
             idx = 0;
