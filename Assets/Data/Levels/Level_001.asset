@@ -20,7 +20,7 @@ MonoBehaviour:
   objects: []
   goalPos: {x: 0, y: -4.65}
   starTimes:
-  - 30
-  - 20
-  - 10
+  - 4.0099993
+  - 9.009999
+  - 3.4028235e+38
   backgroundIndex: 0

@@ -679,6 +679,7 @@ static class RopeHangTestHook
                 RopeBuilderEditor.StartLevelTestRunner();
                 return;
             }
+
         };
     }
 }

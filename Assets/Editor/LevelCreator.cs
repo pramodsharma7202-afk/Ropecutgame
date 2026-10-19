@@ -25,50 +25,52 @@ public static class LevelCreator
         var levels = new List<(string name, Vector2 hero, LevelData.RopeDef[] ropes,
             LevelData.ObjectDef[] objs, Vector2 goal, float[] stars, int bg)>
         {
-            // L1: one rope, Door directly below the Hero, nothing else.
+            // L1: one rope at (0,4), hero (0,1), Door directly below. Win = cut once.
             ("Level_001", new Vector2(0f, 1f),
                 new[] { Rd(new Vector2(0f, 4f), 12) },
                 new LevelData.ObjectDef[0],
                 new Vector2(0f, -4.65f),
-                new[] { 30f, 20f, 10f }, 0),
+                new[] { 10f, 15f, 30f }, 0),
 
-            // L2: one rope, Door offset to the right (needs a swing).
+            // L2: two ropes, anchors (-2.5,4) and (2.5,4), hero (0,1), Door at (3.5,-4.65),
+            // Spikes at (-3.5,-4.65). Win = cut LEFT rope, swing right, cut right rope at bottom.
             ("Level_002", new Vector2(0f, 1f),
-                new[] { Rd(new Vector2(0f, 4f), 12) },
-                new LevelData.ObjectDef[0],
-                new Vector2(2.5f, -4.65f),
-                new[] { 35f, 25f, 15f }, 1),
+                new[] { Rd(new Vector2(-2.5f, 4f), 12), Rd(new Vector2(2.5f, 4f), 12) },
+                new[] { Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(-3.5f, -4.65f, 0f)) },
+                new Vector2(3.5f, -4.65f),
+                new[] { 10f, 15f, 30f }, 1),
 
-            // L3: two ropes holding the Hero, cut both; Spikes on one side.
+            // L3: same V, Door at (-3.5,-4.65), Spikes at (3.5,-4.65). Mirror of L2.
             ("Level_003", new Vector2(0f, 1f),
-                new[] { Rd(new Vector2(-1f, 4f), 12), Rd(new Vector2(1f, 4f), 12) },
-                new[] { Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(-3f, -4.65f, 0f)) },
-                new Vector2(3f, -4.65f),
-                new[] { 40f, 30f, 20f }, 2),
+                new[] { Rd(new Vector2(-2.5f, 4f), 12), Rd(new Vector2(2.5f, 4f), 12) },
+                new[] { Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(3.5f, -4.65f, 0f)) },
+                new Vector2(-3.5f, -4.65f),
+                new[] { 10f, 15f, 30f }, 2),
 
-            // L4: one rope plus a Box blocker and Spikes (Fire/Box interaction
-            // not yet implemented, so Box is just a static blocker).
+            // L4: V ropes plus static Box at (0,-1.5) that blocks straight fall;
+            // hero must swing around it to reach Door at (3.5,-4.65). Spikes at (-3.5,-4.65).
             ("Level_004", new Vector2(0f, 1f),
-                new[] { Rd(new Vector2(0f, 4f), 12) },
+                new[] { Rd(new Vector2(-2.5f, 4f), 12), Rd(new Vector2(2.5f, 4f), 12) },
                 new[]
                 {
-                    Od(LevelData.ObjectDef.PrefabType.Box, new Vector3(-1f, -2f, 0f)),
-                    Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(-3f, -4.65f, 0f))
+                    Od(LevelData.ObjectDef.PrefabType.Box, new Vector3(0f, -1.5f, 0f)),
+                    Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(-3.5f, -4.65f, 0f))
                 },
-                new Vector2(3f, -4.65f),
-                new[] { 45f, 35f, 25f }, 3),
+                new Vector2(3.5f, -4.65f),
+                new[] { 10f, 15f, 30f }, 3),
 
-            // L5: three ropes holding the Hero; correct cut order matters.
+            // L5: three ropes (-2.5,4), (0,5), (2.5,4); Door at (3.5,-4.65),
+            // Spikes under the middle at (0,-4.65). Order matters.
             ("Level_005", new Vector2(0f, 1f),
                 new[]
                 {
-                    Rd(new Vector2(-1.5f, 4f), 12),
-                    Rd(new Vector2(0f, 4f), 12),
-                    Rd(new Vector2(1.5f, 4f), 12)
+                    Rd(new Vector2(-2.5f, 4f), 12),
+                    Rd(new Vector2(0f, 5f), 12),
+                    Rd(new Vector2(2.5f, 4f), 12)
                 },
-                new[] { Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(-4f, -4.65f, 0f)) },
-                new Vector2(4f, -4.65f),
-                new[] { 50f, 40f, 30f }, 4),
+                new[] { Od(LevelData.ObjectDef.PrefabType.Spikes, new Vector3(0f, -4.65f, 0f)) },
+                new Vector2(3.5f, -4.65f),
+                new[] { 10f, 15f, 30f }, 4),
         };
 
         foreach (var (name, hero, ropes, objs, goal, stars, bg) in levels)

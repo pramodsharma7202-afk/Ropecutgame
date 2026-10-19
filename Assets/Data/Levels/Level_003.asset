@@ -14,21 +14,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelData
   heroStart: {x: 0, y: 1}
   ropes:
-  - anchorPos: {x: -1, y: 4}
+  - anchorPos: {x: -2.5, y: 4}
     segmentCount: 12
     targetIsHero: 1
-  - anchorPos: {x: 1, y: 4}
+  - anchorPos: {x: 2.5, y: 4}
     segmentCount: 12
     targetIsHero: 1
   objects:
   - prefabType: 1
-    position: {x: -3, y: -4.65, z: 0}
+    position: {x: 3.5, y: -4.65, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     scale: {x: 1, y: 1, z: 1}
     isStatic: 1
-  goalPos: {x: 3, y: -4.65}
+  goalPos: {x: -3.5, y: -4.65}
   starTimes:
-  - 40
+  - 10
+  - 15
   - 30
-  - 20
   backgroundIndex: 2
