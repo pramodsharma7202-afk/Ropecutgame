@@ -96,6 +96,11 @@ public class LevelLoader : MonoBehaviour
 
         GameManager.EnsureInstance();
         GameManager.Instance.ResetForLevel();
+
+        // The goal disables swipe cutting after a win; re-arm it for every level.
+        var cutter = FindFirstObjectByType<RopeCutter>();
+        if (cutter != null) cutter.Enabled = true;
+
         Debug.Log("[LevelLoader] loaded hero=" + level.heroStart +
             " ropes=" + level.ropes.Count + " objects=" + level.objects.Count);
     }

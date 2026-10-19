@@ -54,10 +54,11 @@ public class RopeCutter : MonoBehaviour
         if (pointer == null) { SetTrailEmitting(false); wasPressed = false; return; }
 
         bool pressed = Enabled && pointer.press.isPressed;
+
         if (pressed)
         {
             cam = cam != null ? cam : Camera.main;
-            if (cam == null) return;
+            if (cam == null) { wasPressed = pressed; return; }
 
             Vector2 screen = pointer.position.ReadValue();
             Vector2 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
@@ -65,18 +66,26 @@ public class RopeCutter : MonoBehaviour
             if (!wasPressed)
             {
                 SetTrailEmitting(true);
-                trail.transform.position = world; // avoid a streak from the old start point
+                Debug.Log("[Cutter] press started at " + world.ToString("F2"));
                 lastWorld = world;
             }
             else
             {
                 if ((world - lastWorld).sqrMagnitude > 0.0001f)
                     CutAt(lastWorld, world);
-                lastWorld = world;
             }
+
+            // The trail must follow the finger EVERY frame while pressed,
+            // otherwise it stays at the first press point and never moves.
+            if (trail != null) trail.transform.position = world;
+            lastWorld = world;
+        }
+        else if (wasPressed)
+        {
+            SetTrailEmitting(false);
+            Debug.Log("[Cutter] press ended");
         }
 
-        if (!pressed || !Enabled) SetTrailEmitting(false);
         wasPressed = pressed;
     }
 
@@ -108,6 +117,7 @@ public class RopeCutter : MonoBehaviour
                 ropesCut.Add(seg.rope); // only the first hit per frame per rope
                 seg.Cut();
                 cutsThisFrame++;
+                Debug.Log("[Cutter] cut segment " + seg.index + " of rope " + seg.rope.name);
             }
         }
         return cutsThisFrame;

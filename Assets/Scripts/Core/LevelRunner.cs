@@ -17,6 +17,18 @@ public class LevelRunner : MonoBehaviour
             idx = 0;
 
         var loader = GetComponent<LevelLoader>();
+
+        // The Game scene is minimal: make sure a swipe cutter exists before the
+        // level loads. RopeCutter.Awake also defaults cutMask when it is zero,
+        // but set it explicitly so the object is self-contained.
+        if (FindFirstObjectByType<RopeCutter>() == null)
+        {
+            var cutterGo = new GameObject("RopeCutter");
+            var cutter = cutterGo.AddComponent<RopeCutter>();
+            cutter.cutMask = LayerMask.GetMask("Rope");
+            cutter.Enabled = true;
+        }
+
         if (levels[idx] == null)
         {
             Debug.LogError("[LevelRunner] LevelData asset missing for index " + idx, this);
