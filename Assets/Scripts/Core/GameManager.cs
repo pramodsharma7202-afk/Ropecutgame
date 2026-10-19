@@ -111,7 +111,9 @@ public class GameManager : MonoBehaviour
     {
         var active = SceneManager.GetActiveScene();
         Debug.Log("[GameManager] Restart -> " + active.path);
+        Time.timeScale = 1f;           // never stay paused across a restart
         SceneManager.LoadScene(active.path);
+        State = GameState.Playing;     // OnSceneLoaded also resets, this covers the same-frame path
     }
 
     /// <summary>Advance to the next level in levelScenes, if any.</summary>

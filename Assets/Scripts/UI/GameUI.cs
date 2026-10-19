@@ -73,6 +73,15 @@ public class GameUI : MonoBehaviour
         if (GameManager.Instance == null) return;
         if (GameManager.Instance.State == GameManager.GameState.Playing)
             levelElapsed += Time.deltaTime;
+
+        // Editor-testing fallback: Enter = Next/Retry (whichever panel shows), R = Restart.
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb == null) return;
+        if (GameManager.Instance.State != GameManager.GameState.Playing)
+        {
+            if (kb.enterKey.wasPressedThisFrame) RetryOrRestart();
+        }
+        if (kb.rKey.wasPressedThisFrame) OnRestartClicked();
     }
 
     void OnLevelLoaded()
@@ -83,6 +92,42 @@ public class GameUI : MonoBehaviour
         if (losePanel != null) losePanel.SetActive(false);
         var cutter = FindFirstObjectByType<RopeCutter>();
         if (cutter != null) cutter.Enabled = true;
+    }
+
+    void OnRetryClicked()
+    {
+        Debug.Log("[UI] Retry clicked");
+        Restart();
+    }
+
+    void OnRestartClicked()
+    {
+        Debug.Log("[UI] Restart clicked");
+        Restart();
+    }
+
+    void RetryOrRestart()
+    {
+        if (losePanel != null && losePanel.activeInHierarchy) OnRetryClicked();
+        else if (winPanel != null && winPanel.activeInHierarchy)
+        {
+            if (winNextButton != null && winNextButton.gameObject.activeInHierarchy) NextLevelClicked();
+            else OnRetryClicked();
+        }
+        else OnRestartClicked();
+    }
+
+    void NextLevelClicked()
+    {
+        var runner = FindFirstObjectByType<LevelRunner>();
+        int next = 0;
+        if (runner != null) next = runner.CurrentLevelIndex + 1;
+        if (runner != null && runner.levels != null && runner.levels.Length > 0)
+            next = Mathf.Clamp(next, 0, runner.levels.Length - 1); // never past the last level
+        Debug.Log("[UI] Next clicked -> level " + (next + 1));
+        PlayerPrefs.SetInt("CurrentLevel", next);
+        PlayerPrefs.Save();
+        Restart();
     }
 
     void OnWon()
@@ -147,27 +192,26 @@ public class GameUI : MonoBehaviour
         if (GameManager.Instance != null) GameManager.Instance.Restart();
     }
 
-    void NextLevel()
-    {
-        var runner = FindFirstObjectByType<LevelRunner>();
-        int next = runner != null ? runner.CurrentLevelIndex + 1 : 0;
-        PlayerPrefs.SetInt("CurrentLevel", next);
-        PlayerPrefs.Save();
-        Restart(); // reloads the active scene; LevelRunner picks up the new index
-    }
-
     // ---- construction ---------------------------------------------------
 
     void BuildEventSystem()
     {
-        var es = FindFirstObjectByType<EventSystem>();
+        // Exactly one EventSystem: duplicates swallow click events.
+        var all = FindObjectsByType<EventSystem>(FindObjectsSortMode.None);
+        var es = all.Length > 0 ? all[0] : null;
+        for (int i = 1; i < all.Length; i++)
+            Destroy(all[i].gameObject);
         if (es == null)
         {
             var go = new GameObject("EventSystem");
             go.transform.SetParent(transform, false);
             es = go.AddComponent<EventSystem>();
-            es.gameObject.AddComponent<InputSystemUIInputModule>();
         }
+
+        var module = es.GetComponent<InputSystemUIInputModule>();
+        if (module == null) module = es.gameObject.AddComponent<InputSystemUIInputModule>();
+        if (module.actionsAsset == null)
+            module.AssignDefaultActions(); // without this the module has no input actions
     }
 
     void BuildCanvas()
@@ -199,7 +243,7 @@ public class GameUI : MonoBehaviour
         var hudRestart = MakeButton(hud, "RestartButton", theme.secondaryButton,
             theme.secondaryColour, "Restart", AnchorPresets.TopCenter,
             new Vector2(0, -150), new Vector2(200, 90));
-        hudRestart.onClick.AddListener(Restart);
+        hudRestart.onClick.AddListener(OnRestartClicked);
         // pin the button to the top right
         var rrt = hudRestart.GetComponent<RectTransform>();
         rrt.anchorMin = new Vector2(1, 1);
@@ -224,19 +268,19 @@ public class GameUI : MonoBehaviour
             var star = CreateChild("Star" + i, AnchorPresets.Center, win);
             star.sizeDelta = new Vector2(160, 160);
             star.anchoredPosition = new Vector2(starX[i], starY[i]);
-            stars[i] = MakeImage(star, theme.starIcon, theme.accentColour);
+            stars[i] = MakeImage(star, theme.starIcon, theme.accentColour, raycastOn: false);
         }
 
         var winNext = MakeButton(win, "NextButton", theme.primaryButton,
             theme.primaryColour, "Next", AnchorPresets.Center,
             new Vector2(-170, -280), new Vector2(260, 110));
-        winNext.onClick.AddListener(NextLevel);
+        winNext.onClick.AddListener(NextLevelClicked);
         winNextButton = winNext;
 
         var winRetry = MakeButton(win, "WinRetryButton", theme.secondaryButton,
             theme.secondaryColour, "Retry", AnchorPresets.Center,
             new Vector2(170, -280), new Vector2(260, 110));
-        winRetry.onClick.AddListener(Restart);
+        winRetry.onClick.AddListener(OnRetryClicked);
 
         allCompleteText = MakeText(win, "AllCompleteText", "All levels complete!",
             AnchorPresets.Center, new Vector2(0, -280), new Vector2(800, 90), 44);
@@ -257,7 +301,7 @@ public class GameUI : MonoBehaviour
         var loseRetry = MakeButton(lose, "LoseRetryButton", theme.secondaryButton,
             theme.secondaryColour, "Retry", AnchorPresets.Center,
             new Vector2(0, -280), new Vector2(280, 110));
-        loseRetry.onClick.AddListener(Restart);
+        loseRetry.onClick.AddListener(OnRetryClicked);
 
         losePanel.SetActive(false);
     }
@@ -317,7 +361,7 @@ public class GameUI : MonoBehaviour
         r.offsetMax = new Vector2(right, top);
     }
 
-    Image MakeImage(RectTransform parent, Sprite sprite, Color color)
+    Image MakeImage(RectTransform parent, Sprite sprite, Color color, bool raycastOn = true)
     {
         var go = new GameObject("Image", typeof(RectTransform));
         ApplyPreset(go.GetComponent<RectTransform>(), AnchorPresets.StretchAll);
@@ -325,6 +369,7 @@ public class GameUI : MonoBehaviour
         var img = go.AddComponent<Image>();
         img.sprite = sprite;
         img.color = color;
+        img.raycastTarget = raycastOn;
         return img;
     }
 
@@ -340,6 +385,7 @@ public class GameUI : MonoBehaviour
         text.alignment = TextAnchor.MiddleCenter;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false; // labels must not eat button clicks
         text.text = content;
         return text;
     }
