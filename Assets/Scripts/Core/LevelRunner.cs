@@ -10,11 +10,18 @@ public class LevelRunner : MonoBehaviour
     [Header("Levels in order")]
     public LevelData[] levels;
 
+    /// <summary>Index of the level loaded by Start (0-based).</summary>
+    public int CurrentLevelIndex { get; private set; }
+    /// <summary>LevelData asset loaded by Start (null until Start ran).</summary>
+    public LevelData CurrentLevel { get; private set; }
+
     void Start()
     {
         int idx = PlayerPrefs.GetInt("CurrentLevel", 0);
         if (idx < 0 || levels == null || idx >= levels.Length)
             idx = 0;
+        CurrentLevelIndex = idx;
+        CurrentLevel = levels != null && idx < levels.Length ? levels[idx] : null;
 
         var loader = GetComponent<LevelLoader>();
 
@@ -36,5 +43,12 @@ public class LevelRunner : MonoBehaviour
         }
         Debug.Log("[LevelRunner] Loading level " + idx + ": " + levels[idx].name);
         loader.Load(levels[idx]);
+
+        // Runtime-built UI: created once here if no scene/persistent one exists.
+        if (FindFirstObjectByType<GameUI>() == null)
+        {
+            var uiGo = new GameObject("GameUI");
+            uiGo.AddComponent<GameUI>();
+        }
     }
 }
