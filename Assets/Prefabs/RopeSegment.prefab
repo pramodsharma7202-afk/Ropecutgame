@@ -165,10 +165,12 @@ MonoBehaviour:
   rope: {fileID: 0}
   body: {fileID: 0}
   capsule: {fileID: 0}
-  joint: {fileID: 0}
   visual: {fileID: 0}
+  upperJoint: {fileID: 0}
+  tailJoint: {fileID: 0}
   halfLocalY: 0
   sparkBurst: {fileID: 4706955109832757541, guid: af654b9473106b54a8d1283f57c8d31b, type: 3}
+  cutFadeTime: 0.15
 --- !u!70 &1363281053958388355
 CapsuleCollider2D:
   m_ObjectHideFlags: 0

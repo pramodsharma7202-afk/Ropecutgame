@@ -17,6 +17,9 @@ public class LevelRunner : MonoBehaviour
 
     void Start()
     {
+        SetupJuice();
+        SetupGroundVisual();
+
         // Keep both entry points in sync: when no explicit list is wired on
         // this component, fall back to the shared LevelCatalog resource.
         if (levels == null || levels.Length == 0)
@@ -58,5 +61,47 @@ public class LevelRunner : MonoBehaviour
             var uiGo = new GameObject("GameUI");
             uiGo.AddComponent<GameUI>();
         }
+    }
+
+    // ---- presentation setup (visual only, no gameplay logic) ---------------
+
+    void SetupJuice()
+    {
+        var cam = Camera.main;
+        if (cam != null && cam.GetComponent<CameraShake>() == null)
+            cam.gameObject.AddComponent<CameraShake>();
+        var fx = FindObjectOfType<JuiceFX>();
+        if (fx == null)
+        {
+            var go = new GameObject("~JuiceFX");
+            go.transform.SetParent(transform, false);
+            go.AddComponent<JuiceFX>();
+        }
+    }
+
+    void SetupGroundVisual()
+    {
+        var ground = GameObject.Find("Ground");
+        if (ground == null || ground.GetComponentInChildren<SpriteRenderer>() != null) return;
+
+        // Body: dark brown slab, top edge aligned to y = -5.
+        var body = new GameObject("GroundVisual");
+        body.transform.SetParent(ground.transform, false);
+        var sr = body.AddComponent<SpriteRenderer>();
+        sr.sprite = RuntimeSprites.WhiteSprite();
+        sr.color = new Color(0.35f, 0.22f, 0.12f);
+        sr.sortingOrder = -5;
+        body.transform.position = new Vector3(0f, -5.5f, 0f);
+        body.transform.localScale = new Vector3(30f, 1f, 1f);
+
+        // Thin lighter top strip.
+        var strip = new GameObject("GroundVisualTop");
+        strip.transform.SetParent(ground.transform, false);
+        var tsr = strip.AddComponent<SpriteRenderer>();
+        tsr.sprite = RuntimeSprites.WhiteSprite();
+        tsr.color = new Color(0.48f, 0.32f, 0.18f);
+        tsr.sortingOrder = -5;
+        strip.transform.position = new Vector3(0f, -5.06f, 0f);
+        strip.transform.localScale = new Vector3(30f, 0.12f, 1f);
     }
 }

@@ -81,7 +81,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 2
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7679083508794041174, guid: 55084cada012430408a06a7a0365dee5, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -153,3 +153,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RopeCutHazard
   damage: 999
+  killTag: Hero
